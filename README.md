@@ -158,3 +158,29 @@ Open http://localhost:3000
 ## License
 
 Internal / enterprise use. Built from the Enterprise AI Agent Orchestrator PRD v2.0 (2026).
+
+
+## Production deployment
+
+```bash
+# Strong secrets
+export SECRET_KEY=$(openssl rand -hex 32)
+export POSTGRES_PASSWORD=$(openssl rand -hex 16)
+export CORS_ORIGINS=https://app.yourdomain.com
+
+# Build & run production overlay
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# Migrations (from backend container or CI)
+# alembic upgrade head
+```
+
+Hardening included:
+- Multi-stage non-root Docker image + HEALTHCHECK
+- Request ID, security headers, in-app rate limiting
+- Production secret validation (`SECRET_KEY`, `DEBUG`)
+- Alembic migrations (`backend/alembic/`)
+- `/health` liveness + `/ready` readiness probes
+- GitHub Actions CI/CD + Dependabot
+- See [SECURITY.md](SECURITY.md) checklist
+

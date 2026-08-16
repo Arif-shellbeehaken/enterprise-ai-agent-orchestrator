@@ -8,10 +8,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.core.config import settings
+from app.core.config import settings, validate_for_production
 from app.core.database import engine, init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging_config import setup_logging
+from app.core.middleware import (
+    RateLimitMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.api.v1 import auth, agents, workflows, audit
 
 setup_logging()
@@ -22,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_for_production(settings)
     logger.info(
         "Starting %s v%s [%s]",
         settings.APP_NAME,
@@ -32,7 +38,9 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("Database tables ready")
     except Exception as exc:
-        # Allow boot without Postgres for local demo / unit tests
+        if settings.ENVIRONMENT == "production":
+            logger.error("Database init failed in production: %s", exc)
+            raise
         logger.warning(
             "DB init skipped / failed (expected if Postgres not running): %s", exc
         )
@@ -46,6 +54,7 @@ app = FastAPI(
     version=settings.APP_VERSION,
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
+    openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
 )
 
@@ -56,9 +65,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agents.router, prefix=settings.API_V1_PREFIX)
@@ -91,9 +103,8 @@ async def readiness():
     except Exception as exc:
         logger.debug("Readiness DB check failed: %s", exc)
 
-    status_code = "ok" if db_ok else "degraded"
     return {
-        "status": status_code,
+        "status": "ok" if db_ok else "degraded",
         "checks": {"database": "ok" if db_ok else "unavailable"},
     }
 
@@ -102,7 +113,7 @@ async def readiness():
 async def root():
     return {
         "message": "Enterprise AI Agent Orchestrator API",
-        "docs": "/docs",
+        "docs": "/docs" if settings.ENVIRONMENT != "production" else None,
         "health": "/health",
         "ready": "/ready",
     }

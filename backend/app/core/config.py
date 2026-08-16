@@ -92,3 +92,27 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def validate_for_production(s: Settings) -> None:
+    """Fail fast if production is misconfigured."""
+    if s.ENVIRONMENT != "production":
+        return
+    weak = (
+        not s.SECRET_KEY
+        or s.SECRET_KEY.startswith("change-me")
+        or len(s.SECRET_KEY) < 32
+    )
+    if weak:
+        raise RuntimeError(
+            "SECRET_KEY must be a strong random value (>=32 chars) in production. "
+            "Generate with: openssl rand -hex 32"
+        )
+    if s.DEBUG:
+        raise RuntimeError("DEBUG must be False in production")
+    if any("localhost" in o for o in s.CORS_ORIGINS):
+        import logging
+        logging.getLogger(__name__).warning(
+            "CORS_ORIGINS contains localhost in production – verify this is intentional"
+        )
+
