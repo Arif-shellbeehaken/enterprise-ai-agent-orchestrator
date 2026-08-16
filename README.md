@@ -1,5 +1,8 @@
 # Enterprise AI Agent Orchestrator MVP
 
+[![CI](https://github.com/Arif-shellbeehaken/enterprise-ai-agent-orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/Arif-shellbeehaken/enterprise-ai-agent-orchestrator/actions/workflows/ci.yml)
+
+
 **Product Requirement Document implementation** — full-stack platform for deploying autonomous AI agents with strict Human-in-the-Loop (HITL) governance, PII anonymization, multi-tenant audit logging, and LangGraph stateful orchestration.
 
 Designed against the 2026 stack targets (Next.js 16+ / FastAPI 0.141+ / LangGraph 0.2+) using current stable package equivalents.

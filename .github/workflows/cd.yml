@@ -1,0 +1,95 @@
+name: CD
+
+# Deploys only on tagged releases or manual dispatch.
+# Configure secrets in repo Settings → Secrets and variables → Actions:
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN  (optional – image publish)
+#   Or use GHCR (built-in GITHUB_TOKEN)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      version: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=${{ github.event.inputs.environment || 'staging' }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Placeholder deploy job – wire to your host (Fly.io, Railway, K8s, etc.)
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    steps:
+      - name: Deployment summary
+        run: |
+          echo "## CD deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: \`${{ github.event.inputs.environment || 'staging' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image tags: \`${{ needs.build-and-push.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Wire this job to your platform (kubectl, flyctl, railway, etc.)." >> $GITHUB_STEP_SUMMARY
+          echo "Image published to GHCR under this repository packages." >> $GITHUB_STEP_SUMMARY
