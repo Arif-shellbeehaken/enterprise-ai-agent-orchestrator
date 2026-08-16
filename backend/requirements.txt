@@ -1,0 +1,51 @@
+# Enterprise AI Agent Orchestrator - Backend Dependencies
+# Pinned to current stable equivalents of the 2026 stack targets
+
+# Core API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-multipart==0.0.20
+email-validator==2.2.0
+
+# Auth & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+greenlet==3.1.1
+
+# Orchestration
+langgraph==0.2.60
+langchain==0.3.14
+langchain-core==0.3.29
+langchain-google-genai==2.0.8
+litellm==1.55.8
+
+# PII / Compliance
+presidio-analyzer==2.2.355
+presidio-anonymizer==2.2.355
+spacy==3.8.3
+
+# Observability (optional self-hosted)
+# langfuse==2.50.0
+
+# Utilities
+httpx==0.28.1
+python-dotenv==1.0.1
+tenacity==9.0.0
+uuid6==2024.7.10
+
+# Dev / Test
+pytest==8.3.4
+pytest-asyncio==0.25.0
+
+# Test
+aiosqlite==0.20.0
+pytest==8.3.4
+pytest-asyncio==0.25.0
